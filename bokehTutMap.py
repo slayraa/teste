@@ -13,8 +13,8 @@ import numpy as np
 
 from bokeh.io import output_file, show, curdoc
 from bokeh.models import HoverTool
-from bokeh.models.widgets import CheckboxButtonGroup
-from bokeh.layouts import widgetbox, column
+from bokeh.models.widgets import Toggle, Slider
+from bokeh.layouts import widgetbox, column, row
 from bokeh.plotting import figure
 from bokeh.tile_providers import get_provider, Vendors
 
@@ -70,15 +70,33 @@ hover2 = HoverTool(tooltips = [
         ('Name','@name'), ('Type', '@type')], renderers=[cr])
 
 p.add_tools(hover2)
-
-
 p.toolbar.autohide = True
 
-checkbox_button_group = CheckboxButtonGroup(
-        labels=["Place Markers", "Ellipses"], active=[0, 1])
+#add buttons
+def updateMarkers(old):
+    if old == 0:
+        toggleMarkers.label="Show Markers"
+        cr.visible = False
+    else:
+        toggleMarkers.label="Hide Markers"
+        cr.visible = True
 
-layout = column(p, widgetbox(checkbox_button_group))
+toggleMarkers = Toggle(label="Hide Markers", active=True)
+toggleMarkers.on_click(updateMarkers)
+
+def updateEllipses(old):
+    if old == 0:
+        toggleEllipses.label="Show Ellipses"
+        el.visible = False
+    else:
+        toggleEllipses.label="Hide Ellipses"
+        el.visible = True
+
+toggleEllipses = Toggle(label="Hide Ellipses", active=True)
+toggleEllipses.on_click(updateEllipses)
+
+layout2 = row(toggleMarkers, toggleEllipses)
+layout = column(p, widgetbox(layout2))
 curdoc().add_root(layout)
-
 
 show(layout)
