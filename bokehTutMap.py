@@ -84,18 +84,17 @@ dataGeo = pd.DataFrame(data = [['loc1','a','39.19501252187821','-8.9154052734375
 
 dataGeo['merc_x'], dataGeo['merc_y'] = zip(*dataGeo[['lat','long']].apply(merc, axis=1))
 
-dataElli = pd.DataFrame(data = [[-992458.3752547285, 4749644.06358428, 3550, 2010, 10, ['a','c'],'c','#CAB2D6',2016],
-                                [-992460.3752547285, 4749648.06358428, 3500, 2000, 20, ['b'],'b','red',2017]
+links = {
+    'loc1': ['loc2', 'loc3'],
+    'loc2': ['loc1', 'loc3'],
+    'loc3': ['loc1', 'loc2'],
+    'loc4': []
+}
+
+dataElli = pd.DataFrame(data = [[-992458.3752547285, 4749644.06358428, 3550, 2010, 10, ['loc1','loc2'],'c','#CAB2D6',2016],
+                                [-992460.3752547285, 4749648.06358428, 3500, 2000, 20, ['loc3', 'loc4'],'b','red',2017]
                                 ],
                        columns=['merc_x','merc_y','height','width','angle','sites','type','color','year'])
-
-
-links = {
-    0: [2],
-    1: [3],
-    2: [0],
-    3: [1]
-}
 
 output_file("mapTryout.html")
 
@@ -122,28 +121,54 @@ el_source = ColumnDataSource(data=dataElli[dataElli['year'] == minTime])
 el = p.ellipse(x='merc_x', y='merc_y', width='width', height='height', angle='angle', source=el_source,
           alpha=0.6, color='color', hover_color='orange', hover_alpha=0.5)
 
+#create segments to appear with hovers
 seg_source = ColumnDataSource({'x0': [], 'y0': [], 'x1': [], 'y1': []})
-sr = p.segment(x0='x0', y0='y0', x1='x1', y1='y1', color='blue', alpha=0.6, line_width=3, source=seg_source, )
+sr = p.segment(x0='x0', y0='y0', x1='x1', y1='y1', color='blue', alpha=0.6, line_width=1, source=seg_source, )
 
+# Add a hover tool, that sets the link data for a hovered circle
 code = """
 var links = %s;
 var data = {'x0': [], 'y0': [], 'x1': [], 'y1': []};
 var cdata = circle.data;
-var indices = cdata.index;
-for (var i = 0; i < indices.length; i++) {
-    var ind0 = indices[i]
-    for (var j = 0; j < links[ind0].length; j++) {
-        var ind1 = links[ind0][j];
-        data['x0'].push(cdata.merc_x[ind0]);
-        data['y0'].push(cdata.merc_y[ind0]);
-        data['x1'].push(cdata.merc_x[ind1]);
-        data['y1'].push(cdata.merc_y[ind1]);
+var edata = ellipse.data
+var indices = cb_data.renderer.data_source.inspected['1d'].indices;
+var sites = edata['sites'][indices[0]];
+var index0 = -1
+
+for (var s = 0; s < sites.length; s++) {
+
+    var pointA = sites[s]
+
+    //find the index of point A
+    for (var i = 0; i < cdata['name'].length; i++) {
+        if (cdata['name'][i] == pointA) {
+            index0 = i;
+            break;
+        }
     }
+
+    //Loop through the links associated with pointA
+    for (var i = 0; i < links[pointA].length; i++) {
+        var pointB = links[pointA][i];
+        
+        //Loop circle data to find coordinates
+        for (var j = 0; j < cdata['name'].length; j++) {
+            if(cdata['name'][j] == pointB) {
+                data['x0'].push(cdata['merc_x'][index0]);
+                data['y0'].push(cdata['merc_y'][index0]);
+                data['x1'].push(cdata['merc_x'][j]);
+                data['y1'].push(cdata['merc_y'][j]);
+            }
+        }
+    }
+
 }
+
 segment.data = data;
+//segment.change.emit();
 """ % links
 
-callback = CustomJS(args={'circle': cr_source, 'segment': sr.data_source}, code=code)
+callback = CustomJS(args={'circle': cr_source, 'ellipse': el_source, 'segment': seg_source}, code=code)
 hover = HoverTool(tooltips = [('Sites','@sites'), ('Type', '@type'), ('Year', '@year')], callback=callback, renderers=[el])
 p.add_tools(hover)
 
@@ -166,7 +191,6 @@ bPlay = Toggle(label="Play", active=False, button_type="success")
 bPlay.on_click(automateMap)
 
 callback_id = None
-
 p.toolbar.autohide = True
 
 #format the layout of the page
